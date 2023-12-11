@@ -88,6 +88,7 @@ def recommend_by_collaborative():
 
     user_ratings = request.json
     recommendations = get_collaborative_recommendations(user_ratings)
+    print(recommendations)
     return jsonify(recommendations)
 
 
