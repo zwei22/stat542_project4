@@ -15,6 +15,97 @@ def get_genre_recommendations(genre):
         return data[genre]
 
 
+def revise_input_data(data):
+    S = pd.read_csv("Top_Smat.csv", index_col=0)
+    R = pd.read_csv("Rmat.csv", index_col=0)
+    M = pd.read_csv(
+        "movies.dat", sep="::", engine="python", encoding="ISO-8859-1", header=None
+    )
+    M.columns = ["MovieID", "Title", "Genres"]
+
+    movieIDs = list(map(lambda x: int(x[1:]), S.index))
+    expanded_data = M.loc[M.MovieID.isin(movieIDs)]
+    expanded_data = expanded_data.drop(columns=["Genres"])
+    expanded_data["Rate"] = np.nan
+
+    data = pd.DataFrame(data)
+    for i in range(len(expanded_data)):
+        ID = expanded_data.iloc[i]["MovieID"]
+        if ID in data.MovieID.values:
+            expanded_data.loc[expanded_data["MovieID"] == ID, "Rate"] = data[
+                data["MovieID"] == ID
+            ]["Rate"].values[0]
+
+    expanded_data.index = expanded_data["MovieID"].values
+    expanded_data = expanded_data.drop(columns=["MovieID", "Title"])
+    expanded_data.index = map(lambda x: "m" + str(x), expanded_data.index)
+    return expanded_data["Rate"]
+
+
+def myIBCF(w):
+    S = pd.read_csv("Top_Smat.csv", index_col=0)
+    R = pd.read_csv("Rmat.csv", index_col=0)
+    M = pd.read_csv(
+        "movies.dat", sep="::", engine="python", encoding="ISO-8859-1", header=None
+    )
+    M.columns = ["MovieID", "Title", "Genres"]
+
+    w_with_rate = w.dropna()
+    rated_movies = w_with_rate.index
+    predicted_ratings = w.copy()
+    all_movies = S.index
+
+    for movie in all_movies:
+        if movie not in rated_movies:
+            S_movie = S.loc[movie]  # Similarity of the movie
+            S_movie_index = (
+                S_movie.dropna().index
+            )  # Only select movies with similarities
+            useful_movies = S_movie_index.intersection(
+                rated_movies
+            )  # Further choose movies with both similarities and ratings
+            # print(useful_movies)
+            # print(w['m2196'])
+
+            U = np.sum(S_movie[useful_movies] * predicted_ratings[useful_movies])
+            D = np.sum(S_movie[useful_movies])
+
+            if D != 0:
+                predicted_ratings[movie] = U / D
+
+    predicted_ratings = predicted_ratings.drop(rated_movies)
+    res = predicted_ratings.sort_values(ascending=False)[:10]
+    res.index = map(lambda x: int(x[1:]), res.index)
+    res = res.sort_index()
+
+    final_df = M[M["MovieID"].isin(res.index)]
+    final_df = final_df.drop(columns=["Genres"])
+    final_df["Rate"] = res.values
+    final_df = final_df.sort_values(by=["Rate"], ascending=False)
+    final_df = final_df.reset_index(drop=True)
+    return final_df
+
+
+def generate_output(res):
+    output = []
+    for i in range(len(res)):
+        output.append(
+            {"MovieID": res.iloc[i]["MovieID"], "Title": res.iloc[i]["Title"]}
+        )
+    return output
+
+
+def System_2(input_data):
+    revised_input = revise_input_data(
+        input_data
+    )  # convert input data from list of dictionary to series
+    recommendations = myIBCF(revised_input)  # get recommendations
+    final_output = generate_output(
+        recommendations
+    )  # format the recommendations to be a list of dictionary
+    return final_output
+
+
 def get_collaborative_recommendations(user_ratings):
     print(user_ratings)
     data = user_ratings
